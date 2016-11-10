@@ -234,7 +234,26 @@ function GetBestRedditMediaLink($data) {
     else {
         $data['media_url'] = 'https://placehold.it/350x150?text=Could+not+find+reddit+media';
     }
+    if (preg_match("/\/i.reddituploads.com\//i", $data['media_url'])) {
+        if (array_key_exists('preview', $data) && array_key_exists('images', $data['preview'])) {
+            $source_url = FindRedditMediaSource($data['preview']['images']);
+            if (! is_null($source_url)) {
+                $data['media_url'] = $source_url;
+            }
+        }
+    }
     return $data;
+}
+
+function FindRedditMediaSource($imageObj) {
+    $returnVar = NULL;
+    foreach ($imageObj as $data) {
+        if(array_key_exists('source', $data) && array_key_exists('url', $data['source'])) {
+            $returnVar = $data['source']['url'];
+            break;
+        }
+    }
+    return $returnVar;
 }
 
 function GetImgurAPIKey() {
