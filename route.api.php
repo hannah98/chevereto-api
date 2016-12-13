@@ -187,6 +187,9 @@ function ProcessImageURL($url) {
     if (preg_match("/imgur\.com/i", $url)) {
         $url = FindImgurURL($url);
     }
+    if (preg_match("/gfycat\.com/i", $url)) {
+        $url = FindGfycatURL($url);
+    }
     // Chevereto has a problem with the gifv extension, so as a workaround
     // converting gifv in URL to gif
     $url = preg_replace('/\.gifv$/', '.gif', $url);
@@ -234,6 +237,7 @@ function GetBestRedditMediaLink($data) {
     else {
         $data['media_url'] = 'https://placehold.it/350x150?text=Could+not+find+reddit+media';
     }
+    # The URL reddit uses for their own upload server is not downloadable.  Switch to the source if possible.
     if (preg_match("/\/i.reddituploads.com\//i", $data['media_url'])) {
         if (array_key_exists('preview', $data) && array_key_exists('images', $data['preview'])) {
             $source_url = FindRedditMediaSource($data['preview']['images']);
@@ -264,6 +268,24 @@ function GetImgurAPIKey() {
     }
     SendLog("Returning key: $key");
     return $key;
+}
+
+function FindGfycatURL($url) {
+    SendLog("Getting Gfycat Information");
+    $GfycatID = GetGfycatID($url);
+    $api_url = 'http://gfycat.com/cajax/get/' . $GfycatID;
+    SendLog("API URL: $api_url");
+    $json_data = json_decode(G\fetch_url($api_url), TRUE);
+    if(!is_null($json_data['gfyItem'])) {
+        $info = $json_data['gfyItem'];
+        if(!is_null($info['gifUrl'])) {
+            $url = $info['gifUrl'];
+        }
+        elseif(!is_null($info['webmUrl'])) {
+            $url = $info['webmUrl'];
+        }
+    }
+    return $url;
 }
 
 function FindImgurURL($url) {
@@ -303,6 +325,15 @@ function FindImgurURL($url) {
     }
     SendLog("Returning URL: $url");
     return $url;
+}
+
+function GetGfycatID($url) {
+    preg_match('/gfycat\.com\/([^\/]+)/i', $url, $matches);
+    $gfycat_id = $matches[1];
+    # get rid of "#" on the end
+    $gfycat_id = explode('#', $gfycat_id)[0];
+    SendLog("Gfycat ID found: $gfycat_id");
+    return $gfycat_id;
 }
 
 function GetImgurID($url) {
