@@ -85,54 +85,54 @@ $route = function($handler) {
                         $source = $_FILES['source'];
                         $type = 'file';
                 } else {
-                        if(!G\is_image_url($source) && !G\is_url($source)) {
+                    if(!G\is_image_url($source) && !G\is_url($source)) {
 
-                                // Base64 comes from POST?
-                                if($_SERVER['REQUEST_METHOD'] !== 'POST') {
-                                        throw new Exception('Upload using base64 source must be done using POST method.', 130);
-                                }
+                            // Base64 comes from POST?
+                            if($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                                    throw new Exception('Upload using base64 source must be done using POST method.', 130);
+                            }
 
-                                // Fix the $source base64 string
-                                $source = trim(preg_replace('/\s+/', '', $source));
+                            // Fix the $source base64 string
+                            $source = trim(preg_replace('/\s+/', '', $source));
 
-                                // From _GET source should be urlencoded base64
-                                if(!G\timing_safe_compare(base64_encode(base64_decode($source)), $source)){
-                                        throw new Exception('Invalid base64 string.', 120);
-                                }
+                            // From _GET source should be urlencoded base64
+                            if(!G\timing_safe_compare(base64_encode(base64_decode($source)), $source)){
+                                    throw new Exception('Invalid base64 string.', 120);
+                            }
 
-                                // Set the API temp file
-                                $api_temp_file = @tempnam(sys_get_temp_dir(), 'chvtemp');
+                            // Set the API temp file
+                            $api_temp_file = @tempnam(sys_get_temp_dir(), 'chvtemp');
 
-                                if(!$api_temp_file or !@is_writable($api_temp_file)) {
-                                        throw new UploadException("Can't get a tempnam.", 200);
-                                }
+                            if(!$api_temp_file or !@is_writable($api_temp_file)) {
+                                    throw new UploadException("Can't get a tempnam.", 200);
+                            }
 
-                                $fh = fopen($api_temp_file, 'w');
-                                stream_filter_append($fh, 'convert.base64-decode', STREAM_FILTER_WRITE);
-                                if(!@fwrite($fh, $source)) {
-                                        throw new Exception('Invalid base64 string.', 130);
-                                } else {
-                                        // Since all the validations works with $_FILES, we're going to emulate it.
-                                        $source = array(
-                                                'name'          => G\random_string(12).'.jpg',
-                                                'type'          => 'image/jpeg',
-                                                'tmp_name'      => $api_temp_file,
-                                                'error'         => 'UPLOAD_ERR_OK',
-                                                'size'          => '1'
-                                        );
-                                }
-                                fclose($fh);
-                        }
-            else {
-                // If it is an image URL, parse out media URL from reddit posts, if applicable
-                SendLog("Old URL: $source");
-                $source = ProcessImageURL($source);
-                SendLog("New URL: $source");
-            }
+                            $fh = fopen($api_temp_file, 'w');
+                            stream_filter_append($fh, 'convert.base64-decode', STREAM_FILTER_WRITE);
+                            if(!@fwrite($fh, $source)) {
+                                    throw new Exception('Invalid base64 string.', 130);
+                            } else {
+                                    // Since all the validations works with $_FILES, we're going to emulate it.
+                                    $source = array(
+                                            'name'          => G\random_string(12).'.jpg',
+                                            'type'          => 'image/jpeg',
+                                            'tmp_name'      => $api_temp_file,
+                                            'error'         => 'UPLOAD_ERR_OK',
+                                            'size'          => '1'
+                                    );
+                            }
+                            fclose($fh);
+                    }
+                    else {
+                        // If it is an image URL, parse out media URL from reddit posts, if applicable
+                        SendLog("Old URL: $source");
+                        $source = ProcessImageURL($source);
+                        SendLog("New URL: $source");
+                    }
                 }
 
                 // CHV\Image::uploadToWebsite($source, 'username', [params]) to inject API uploads to a given username
-        $uploaded_id = CHV\Image::uploadToWebsite($source, $user);
+                $uploaded_id = CHV\Image::uploadToWebsite($source, $user);
                 $json_array['status_code'] = 200;
                 $json_array['success'] = array('message' => 'image uploaded', 'code' => 200);
                 $json_array['image'] = CHV\Image::formatArray(CHV\Image::getSingle($uploaded_id, false, false), true);
@@ -262,11 +262,9 @@ function FindRedditMediaSource($imageObj) {
 
 function GetImgurAPIKey() {
     $key = getenv('IMGUR_API_KEY');
-    SendLog("Getting key");
     if(is_null($key) || strlen($key)<1) {
         throw new Exception("No IMGUR_API_KEY supplied", 101);
     }
-    SendLog("Returning key: $key");
     return $key;
 }
 
@@ -274,7 +272,7 @@ function FindGfycatURL($url) {
     SendLog("Getting Gfycat Information");
     $GfycatID = GetGfycatID($url);
     $api_url = 'http://gfycat.com/cajax/get/' . $GfycatID;
-    SendLog("API URL: $api_url");
+    //SendLog("API URL: $api_url");
     $json_data = json_decode(G\fetch_url($api_url), TRUE);
     if(!is_null($json_data['gfyItem'])) {
         $info = $json_data['gfyItem'];
@@ -290,15 +288,18 @@ function FindGfycatURL($url) {
 
 function FindImgurURL($url) {
     SendLog("Getting Imgur Information");
-    if (preg_match("@/a/@i", $url)) {
-        return; // leave albums alone
-    }
-    elseif (preg_match("@/gallery/@i", $url)) {
-        return; // leave galleries alone
-    }
     $ImgurID = GetImgurID($url);
     $api_url = "https://api.imgur.com/3/image/${ImgurID}";
-    SendLog("API URL: $api_url");
+    $album_indicator = false;
+    if (preg_match("@/a/@i", $url)) {
+        $api_url = "https://api.imgur.com/3/album/${ImgurID}";
+        $album_indicator = true;
+    }
+    elseif (preg_match("@/gallery/@i", $url)) {
+        $api_url = "https://api.imgur.com/3/album/${ImgurID}";
+        $album_indicator = true;
+    }
+    //SendLog("API URL: $api_url");
     $imgur_api_key = GetImgurAPIKey();
     $imgur_opts = array(
         CURLOPT_HEADER => false,
@@ -310,6 +311,13 @@ function FindImgurURL($url) {
     $imgurData = json_decode($imgurJSON,true);
     if(!is_null($imgurData['data'])) {
         $info = $imgurData['data'];
+        if($album_indicator) {
+            // Get first one for now
+            $image = $info['images'][0];
+            $url = $image['link'];
+            SendLog("Single URL: $url");
+            return $url;
+        }
         if(!is_null($info['gifv'])) {
             $url = $info['gifv'];
         }
@@ -337,8 +345,19 @@ function GetGfycatID($url) {
 }
 
 function GetImgurID($url) {
-    preg_match('/imgur\.com\/([a-zA-Z0-9]{5,8})/i', $url, $matches);
-    $imgur_id = $matches[1];
+    $imgur_id = '';
+    if (preg_match("@/gallery/@i", $url)) {
+        preg_match('/imgur\.com\/gallery\/([a-zA-Z0-9]{5,8})/i', $url, $matches);
+        $imgur_id = $matches[1];
+    }
+    elseif (preg_match("@/a/@i", $url)) {
+        preg_match('/imgur\.com\/a\/([a-zA-Z0-9]{5,8})/i', $url, $matches);
+        $imgur_id = $matches[1];
+    }
+    else {
+        preg_match('/imgur\.com\/([a-zA-Z0-9]{5,8})/i', $url, $matches);
+        $imgur_id = $matches[1];
+    }
     SendLog("Imgur ID found: $imgur_id");
     return $imgur_id;
 }
